@@ -12,11 +12,10 @@
 #include <sys/wait.h>
 #include <fstream>
 #include <map>
-#include <fstream>
 #include <sstream>
 
-#define PORT 24143         // client port: dynamically
-#define HOST "127.0.0.1"    // local host
+#define PORT 24143          // Client TCP port -> dynamically, this port is AWS TCP port
+#define HOST "127.0.0.1"    // Local host
 
 using namespace std;
 
@@ -25,44 +24,37 @@ void processDist(string &s, map<int, int> &mp);
 
 int main(int argc, char *argv[]) {
 
-    /* --------------------------------------------------------------- */
-    /* -------------------- INITIALIZES VARIABLES -------------------- */
-    /* --------------------------------------------------------------- */
-    int socTCP; // TCP socket: client -> aws
+    /* -------------------- Iinitializes Variables -------------------- */
+    int socTCP;     // Client TCP socket
     int dataSend;
     int indicator = 0;
-
+    
     char *mapID;
     char *sourceIdx;
     char *fileSize;
     char distances[2000];
     char results[8000];
-    string buffer;
 
+    string buffer;
+    stringstream strs_1, strs_2;
     map<int, int> mp = map<int, int>();
 
     struct sockaddr_in awsTCPaddr;
     struct sockaddr_in my_addr;
     socklen_t my_addr_size;
 
-    stringstream strs_1, strs_2;
-
-    /* ---------------------------------------------------------------- */
-    /* ----------------------- PROCESSES INPUT ------------------------ */
-    /* ---------------------------------------------------------------- */
+    /* ----------------------- Processes Input ------------------------ */
     mapID = argv[1];
     strs_1 << atoi(argv[2]);
     sourceIdx = (char *)strs_1.str().c_str();
-    strs_2 << atol(argv[3]);
+    strs_2 << atoll(argv[3]);
     fileSize = (char *)strs_2.str().c_str();
     buffer = strs_1.str() + "f" + strs_2.str();
 
-    /* ---------------------------------------------------------------- */
-    /* ---------------------- ESTABLISHES SOCKET ---------------------- */
-    /* ---------------------------------------------------------------- */
+    /* ---------------------- Establishes Socket ---------------------- */
     socTCP = socket(PF_INET, SOCK_STREAM, 0);
     if (socTCP == -1) {
-        perror("Client-socket");
+        perror("Error: Client-TCP socket!");
         exit(-1);
     }
 
@@ -71,64 +63,66 @@ int main(int argc, char *argv[]) {
     awsTCPaddr.sin_port = htons(PORT);
     inet_pton(AF_INET, HOST, &(awsTCPaddr.sin_addr));
 
-    /* ----------------------------------------------------------------- */
-    /* ---------------------- ESTABLISHES CONNECT ---------------------- */
-    /* ----------------------------------------------------------------- */
+    /* ---------------------- Establishes Connect ---------------------- */
     if (connect(socTCP, (struct sockaddr *)&awsTCPaddr, sizeof awsTCPaddr) == -1) {
         close(socTCP);
-        perror("Client-connect");
+        perror("Error: Client-TCP connects!");
         exit(-1);
     }
+
     printf("\nThe client is up and running.\n");
 
+    // This part is cited from our project instruction: gets Client TCP socket port number
     my_addr_size = sizeof my_addr;
     if (getsockname(socTCP, (struct sockaddr *)&my_addr, &my_addr_size) == -1) {
         close(socTCP);
-        perror("Client-getSocketName");
+        perror("Error: Client-TCP gets socket name (port number)!");
         exit(-1);
     }
     
-    /* ----------------------------------------------------------------- */
-    /* ----------------------- SENDS QUERY INFO ------------------------ */
-    /* ----------------------------------------------------------------- */
-    dataSend = send(socTCP, mapID, strlen(mapID), 0); // Send Map ID
+    /* ----------------------- Sends Query Info ------------------------ */
+    // TCP: Sends Map ID to AWS
+    dataSend = send(socTCP, mapID, strlen(mapID), 0);
     if (dataSend <= 0) {
         close(socTCP);
-        perror("Client-mapID");
+        perror("Error: Client-TCP sends Map ID!");
         exit(-1);
     }
 
-    dataSend = send(socTCP, buffer.c_str(), 1000, 0); // Send Source Vertex Idx and File Size
+    // TCP: Sends Source Vertex Idx and File Size to AWS
+    dataSend = send(socTCP, buffer.c_str(), 1000, 0);
     if (dataSend <= 0) {
         close(socTCP);
-        perror("Client-sourceIdxAndFileSize");
+        perror("Error: Client-TCP sends source vertex index and file size!");
         exit(-1);
     }
+
     printf("\nThe client has sent query to AWS using TCP over port <%d>: start vertex <%s>; map <%s>; file size <%s>\n", 
         ntohs(my_addr.sin_port), sourceIdx, mapID, fileSize);
 
-    // Gets the result from AWS
+    // TCP: Receives distances from AWS
     if (recv(socTCP, distances, 2000, 0) == -1) {
         close(socTCP);
-        perror("Client-receive-results");
+        perror("Error: Client-TCP receives distances!");
         exit(-1);
     }
     string dists(distances);
 
+    // TCP: Receives delays from AWS
     if (recv(socTCP, results, 8000, 0) == -1) {
         close(socTCP);
-        perror("Client-receive-results");
+        perror("Error: Client-TCP receives delays!");
         exit(-1);
     }
     string res(results);
 
     processDist(dists, mp);
     showResult(res, mp);
-
     close(socTCP);
     return 0;
 }
 
+// Shows the final result on screen
 void showResult(string &s, map<int, int> &mp) {
     size_t sign_f = s.find('f');
     double tt = atof(s.substr(1, sign_f).c_str());
@@ -167,6 +161,7 @@ void showResult(string &s, map<int, int> &mp) {
     printf("----------------------------------------------------------------------------\n");
 }
 
+// Extracts all shortest distances with corresponding vertex into a map
 void processDist(string &s, map<int, int> &mp) {
     size_t sign_f = s.find('f');
     for (size_t i = sign_f + 1, begin = sign_f + 1; i < s.length() ; i++) {
