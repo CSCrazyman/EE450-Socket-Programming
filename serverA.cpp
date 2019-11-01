@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
 void readMaps(map<char, Graph<int> > &mp, vector<char> &list, const string &filename) {
     ifstream file(filename);
     string line;
-    int v, count = 0;
+    int v = 0, count = 0;
     double trans, prop;
     bool has = false;
     char first_letter;
@@ -156,11 +156,12 @@ void readMaps(map<char, Graph<int> > &mp, vector<char> &list, const string &file
 
     while (getline(file, line)) {
         char temp = line.c_str()[0];
-        if (temp >= 'A' && temp <= 'Z') {
+        if ((temp >= 'A' && temp <= 'Z') || (temp >= 'a' && temp <= 'z')) {
             list.push_back(temp);
             if (has) {
                 g.setV(v + 1);
                 mp.insert(make_pair(first_letter, g));
+                v = 0;
             }
             first_letter = temp;
             has = true;
@@ -182,7 +183,7 @@ void readMaps(map<char, Graph<int> > &mp, vector<char> &list, const string &file
             stringstream ss(line);
             int a, b, dist;
             ss >> a >> b >> dist;
-            v = max(a, b);
+            v = max(v, max(a, b));
         }
     }
 
@@ -194,7 +195,7 @@ void readMaps(map<char, Graph<int> > &mp, vector<char> &list, const string &file
 
     while (getline(file, line)) {
         char temp = line.c_str()[0];
-        if (temp >= 'A' && temp <= 'Z') {
+        if ((temp >= 'A' && temp <= 'Z') || (temp >= 'a' && temp <= 'z')) {
             first_letter = temp;
             count++;
         }
